@@ -1,0 +1,135 @@
+import { connectDB } from "@/lib/db";
+import Customer from "@/lib/models/Customer";
+import { customerSchema } from "@/lib/utils/validators";
+import { NextRequest, NextResponse } from "next/server";
+
+// auth config
+import mongoose from "mongoose";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    await connectDB();
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    const customer = await Customer.findById(id);
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: customer,
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to fetch customer" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function PUT(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    const body = await req.json();
+    const validated = customerSchema.parse(body);
+
+    await connectDB();
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    const customer = await Customer.findByIdAndUpdate(id, validated, {
+      new: true,
+      runValidators: true,
+    });
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      data: customer,
+      message: "Customer updated successfully",
+    });
+  } catch (error: any) {
+    if (error.name === "ZodError") {
+      return NextResponse.json(
+        { error: error.errors[0].message },
+        { status: 400 }
+      );
+    }
+    return NextResponse.json(
+      { error: "Failed to update customer" },
+      { status: 500 }
+    );
+  }
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const session = await getServerSession(authOptions);
+    if (!session) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const { id } = await params;
+    await connectDB();
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
+    }
+
+    const customer = await Customer.findByIdAndDelete(id);
+
+    if (!customer) {
+      return NextResponse.json(
+        { error: "Customer not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: "Customer deleted successfully",
+    });
+  } catch (error) {
+    return NextResponse.json(
+      { error: "Failed to delete customer" },
+      { status: 500 }
+    );
+  }
+}
