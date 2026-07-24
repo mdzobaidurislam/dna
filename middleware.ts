@@ -8,8 +8,9 @@ export async function middleware(req) {
     secret: process.env.NEXTAUTH_SECRET,
   });
 
+  const { pathname } = req.nextUrl;
 
-  if (!token) {
+  if (!token && pathname.startsWith("/dashboard")) {
     return NextResponse.redirect(new URL("/login", req.url));
   }
   let tempUserId = req.cookies.get('temp_userid');
