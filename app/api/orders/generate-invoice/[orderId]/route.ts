@@ -378,7 +378,7 @@ const protocol = host.startsWith("localhost") ? "http" : "https";
 const baseUrl = `${protocol}://${host}/api/orders/generate-invoice/${order._id}`;
 
   const verifyBaseUrl = settings?.verify_base_url || baseUrl;
-  const qrText = `${verifyBaseUrl}/${order.dna_id || order._id}`;
+  const qrText = `${verifyBaseUrl}`;
   try {
     const qrDataUrl = await getQrDataUrl(qrText);
     const qrSize = 50;

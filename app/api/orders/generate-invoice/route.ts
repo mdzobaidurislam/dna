@@ -216,7 +216,7 @@ async function getQrDataUrl(text: string): Promise<string> {
   });
 }
 
-async function drawCertificate(doc: jsPDF, order: any, settings: any) {
+async function drawCertificate(doc: jsPDF, order: any, settings: any,req: any) {
   const cardX = 8;
   const cardY = 8;
   const cardW = PAGE_W - cardX * 2;
@@ -370,9 +370,16 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   setFill(doc, TEAL);
   doc.circle(rightCenterX, divY, 1, "F");
 
-  // QR code
-  const verifyBaseUrl = settings?.verify_base_url || "https://vetgenelab.example.com/verify";
-  const qrText = `${verifyBaseUrl}/${order.dna_id || order._id}`;
+  // qrcode 
+const host = req.headers.get("host") || "localhost:3000";
+
+const protocol = host.startsWith("localhost") ? "http" : "https";
+
+const baseUrl = `${protocol}://${host}/api/orders/generate-invoice/${order._id}`;
+
+  const verifyBaseUrl = settings?.verify_base_url || baseUrl;
+  const qrText = `${verifyBaseUrl}`;
+
   try {
     const qrDataUrl = await getQrDataUrl(qrText);
     const qrSize = 50;
@@ -468,7 +475,7 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < orders.length; i++) {
       if (i > 0) doc.addPage([PAGE_W, PAGE_H], "landscape");
-      await drawCertificate(doc, orders[i], settings);
+      await drawCertificate(doc, orders[i], settings, req);
     }
 
     const pdfBuffer = doc.output("arraybuffer");

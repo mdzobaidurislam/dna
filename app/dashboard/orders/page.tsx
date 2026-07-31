@@ -394,7 +394,7 @@ export default function OrdersPage() {
                   DNA ID
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                  Birth ID
+                  Ring ID
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
                   Species
