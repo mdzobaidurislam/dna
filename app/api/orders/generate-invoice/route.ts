@@ -443,9 +443,9 @@ const baseUrl = `${protocol}://${host}/api/orders/generate-invoice/${order._id}`
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    // if (!session) {
+    //   return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    // }
 
     const body = await req.json();
     const { orderId } = body;
