@@ -274,7 +274,7 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
     ["Species", order.species_id?.name || "N/A", "leaf"],
     ["Owner Name", order.customer_id?.name || "N/A", "person"],
     ["Farm Name", order.customer_id?.farm_name || "N/A", "house"],
-    ["Sample Type", order.sample_type || "N/A", "leaf"],
+    ["Sample Type", order.sample_type || "Feather", "leaf"],
     ["DNA Result", order.sex || "N/A", "clipboard"],
     [
       "Received Date",

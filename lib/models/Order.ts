@@ -34,6 +34,10 @@ const OrderSchema = new mongoose.Schema(
       enum: ["pending", "processing", "completed", "rejected"],
       default: "pending",
     },
+    sample_type: {
+      type: String,
+      default: 'Feather',
+    },
     sex: {
       type: String,
       enum: ["male", "female", "unknown"],
