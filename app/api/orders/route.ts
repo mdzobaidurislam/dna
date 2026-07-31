@@ -92,8 +92,6 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json();
     const validated = orderSchema.parse(body);
-    console.log(validated);
-    console.log(body);
 
     await connectDB();
 

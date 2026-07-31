@@ -216,7 +216,7 @@ async function getQrDataUrl(text: string): Promise<string> {
   });
 }
 
-async function drawCertificate(doc: jsPDF, order: any, settings: any) {
+async function drawCertificate(doc: jsPDF, order: any, settings: any,req: NextRequest) {
   const cardX = 8;
   const cardY = 8;
   const cardW = PAGE_W - cardX * 2;
@@ -370,8 +370,14 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   setFill(doc, TEAL);
   doc.circle(rightCenterX, divY, 1, "F");
 
-  // QR code
-  const verifyBaseUrl = settings?.verify_base_url || "https://vetgenelab.example.com/verify";
+  // qrcode 
+const host = req.headers.get("host") || "localhost:3000";
+
+const protocol = host.startsWith("localhost") ? "http" : "https";
+
+const baseUrl = `${protocol}://${host}/api/orders/generate-invoice/${order._id}`;
+
+  const verifyBaseUrl = settings?.verify_base_url || baseUrl;
   const qrText = `${verifyBaseUrl}/${order.dna_id || order._id}`;
   try {
     const qrDataUrl = await getQrDataUrl(qrText);
@@ -433,16 +439,20 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   );
 }
 
-export async function POST(req: NextRequest) {
+
+
+export async function GET(
+  req: NextRequest,
+  { params }: { params: Promise<{ orderId: string }> }
+) {
   try {
     const session = await getServerSession(authOptions);
     if (!session) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    const body = await req.json();
-    const { orderIds } = body;
-    
+    const { orderId } = await params;
+    let orderIds = [orderId];
     if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
       return NextResponse.json(
         { error: "No orders selected" },
@@ -468,7 +478,7 @@ export async function POST(req: NextRequest) {
 
     for (let i = 0; i < orders.length; i++) {
       if (i > 0) doc.addPage([PAGE_W, PAGE_H], "landscape");
-      await drawCertificate(doc, orders[i], settings);
+      await drawCertificate(doc, orders[i], settings,req);
     }
 
     const pdfBuffer = doc.output("arraybuffer");
@@ -487,4 +497,3 @@ export async function POST(req: NextRequest) {
     );
   }
 }
-

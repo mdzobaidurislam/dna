@@ -1,27 +1,10 @@
-import { connectDB } from "@/lib/db";
-import Order from "@/lib/models/Order";
-import Settings from "@/lib/models/Settings";
-import { NextRequest, NextResponse } from "next/server";
-
 import { jsPDF } from "jspdf";
-import mongoose from "mongoose";
 import QRCode from "qrcode";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
 import fs from "fs";
 import path from "path";
 
-const logoPath = path.join(process.cwd(), "public/logo.png");
-
-let logoBase64: string | null = null;
-
-if (fs.existsSync(logoPath)) {
-  logoBase64 =
-    "data:image/png;base64," +
-    fs.readFileSync(logoPath).toString("base64");
-}
 // ---------- Theme colors (matched to VetGene certificate design) ----------
-type RGB = [number, number, number];
+export type RGB = [number, number, number];
 const NAVY: RGB = [13, 27, 61];
 const TEAL: RGB = [14, 122, 121];
 const TEAL_LIGHT: RGB = [95, 191, 187];
@@ -41,6 +24,24 @@ function setText(doc: jsPDF, c: RGB) {
   doc.setTextColor(c[0], c[1], c[2]);
 }
 
+// ---------- Logo image (real asset, replaces hand-drawn VG + text) ----------
+// Put the logo file at: /public/vetgene-logo.png
+const LOGO_ASPECT_RATIO = 598 / 197; // width / height of vetgene-logo.png
+
+let cachedLogoBase64: string | null = null;
+function getLogoBase64(): string | null {
+  if (cachedLogoBase64) return cachedLogoBase64;
+  try {
+    const logoPath = path.join(process.cwd(), "public", "vetgene-logo.png");
+    const buf = fs.readFileSync(logoPath);
+    cachedLogoBase64 = `data:image/png;base64,${buf.toString("base64")}`;
+    return cachedLogoBase64;
+  } catch (err) {
+    console.error("Logo image not found at /public/vetgene-logo.png:", err);
+    return null;
+  }
+}
+
 type IconType =
   | "dna"
   | "bird"
@@ -51,7 +52,6 @@ type IconType =
   | "calendar"
   | "document";
 
-/** Small DNA double-helix drawn with plain line segments (no border). */
 function drawDnaHelix(doc: jsPDF, cx: number, cy: number, size: number, color: RGB = TEAL) {
   const s = size;
   const pts1: [number, number][] = [];
@@ -74,7 +74,6 @@ function drawDnaHelix(doc: jsPDF, cx: number, cy: number, size: number, color: R
   }
 }
 
-/** Bare simplified vector glyph (no border square) — used standalone in header/footer circles. */
 function drawIconGlyph(
   doc: jsPDF,
   type: IconType,
@@ -146,7 +145,6 @@ function drawIconGlyph(
   }
 }
 
-/** Icon glyph inside a rounded-square border — used in the left field column. */
 function drawFieldIcon(
   doc: jsPDF,
   type: IconType,
@@ -166,7 +164,6 @@ interface Point {
   y: number;
 }
 
-/** Builds a closed polygon from absolute points and fills/strokes it. */
 function polygonFromPoints(doc: jsPDF, points: Point[], style: string) {
   const deltas: [number, number][] = [];
   for (let i = 1; i < points.length; i++) {
@@ -186,7 +183,6 @@ function quadraticBezier(p0: Point, p1: Point, p2: Point, segments: number): Poi
   return pts;
 }
 
-/** Smooth curved navy header banner (sampled bezier), replacing a plain rectangle. */
 function drawHeaderBanner(doc: jsPDF, cardX: number, cardY: number, cardW: number) {
   const bannerH = 34;
   const topX = cardX + cardW * 0.6;
@@ -216,43 +212,44 @@ async function getQrDataUrl(text: string): Promise<string> {
   });
 }
 
+/**
+ * Base URL used to build the QR "scan to download" link.
+ * Set NEXT_PUBLIC_SITE_URL (or SITE_URL) in your .env, e.g.
+ *   NEXT_PUBLIC_SITE_URL=https://vetgenelab.com
+ * Falls back to settings.verify_base_url, then a placeholder.
+ */
+function resolveBaseUrl(settings: any): string {
+  return (
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    process.env.SITE_URL ||
+    settings?.verify_base_url ||
+    "https://vetgenelab.example.com"
+  ).replace(/\/+$/, "");
+}
+
 async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   const cardX = 8;
   const cardY = 8;
   const cardW = PAGE_W - cardX * 2;
   const cardH = PAGE_H - cardY * 2;
 
-  // Outer card border
   setDraw(doc, [210, 213, 218]);
   doc.setLineWidth(0.6);
   doc.roundedRect(cardX, cardY, cardW, cardH, 4, 4, "S");
 
-  // ---------- Header ----------
   drawHeaderBanner(doc, cardX, cardY, cardW);
 
-  setText(doc, NAVY);
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(26);
-  // doc.text("VG", cardX + 12, cardY + 22);
+  const logoBase64 = getLogoBase64();
   if (logoBase64) {
-    doc.addImage(logoBase64, "PNG", cardX + 8, cardY + 8, 60, 20);
+    const logoH = 24;
+    const logoW = logoH * LOGO_ASPECT_RATIO;
+    doc.addImage(logoBase64, "PNG", cardX + 10, cardY + 8, logoW, logoH);
+  } else {
+    setText(doc, NAVY);
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(20);
+    doc.text("VetGene", cardX + 12, cardY + 20);
   }
-
-  // doc.setFontSize(20);
-  // setText(doc, NAVY);
-  // doc.text("Vet", cardX + 34, cardY + 16);
-  // const vetWidth = doc.getTextWidth("Vet");
-  // setText(doc, TEAL);
-  // doc.text("Gene", cardX + 34 + vetWidth, cardY + 16);
-
-  // doc.setFontSize(8.5);
-  // setText(doc, TEAL);
-  // doc.setFont("helvetica", "normal");
-  // doc.text("L A B O R A T O R Y", cardX + 34, cardY + 21.5);
-
-  // doc.setFontSize(7.5);
-  // setText(doc, GRAY_TEXT);
-  // doc.text("Precision in Animal Genetics", cardX + 34, cardY + 26.5);
 
   setText(doc, [255, 255, 255]);
   doc.setFont("helvetica", "bold");
@@ -263,7 +260,6 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   doc.circle(cardX + cardW - 68, cardY + 17, 6.5, "S");
   drawDnaHelix(doc, cardX + cardW - 68, cardY + 17, 9, TEAL_LIGHT);
 
-  // ---------- Layout split ----------
   const splitX = cardX + cardW * 0.63;
   const contentTop = cardY + 44;
   const contentBottom = cardY + cardH - 24;
@@ -272,7 +268,6 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   doc.setLineWidth(0.3);
   doc.line(splitX, contentTop - 6, splitX, contentBottom);
 
-  // ---------- Left column: field rows ----------
   const fields: [string, string, IconType][] = [
     ["DNA ID", order.dna_id ? String(order.dna_id) : "-", "dna"],
     ["Bird ID", order.name ? String(order.name) : "-", "bird"],
@@ -283,22 +278,22 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
     ["DNA Result", order.sex || "N/A", "clipboard"],
     [
       "Received Date",
-      order.entry_date
-        ? new Date(order.entry_date).toLocaleDateString("en-GB")
+      order.received_date
+        ? new Date(order.received_date).toLocaleDateString("en-GB")
         : "-",
       "calendar",
     ],
     [
       "Reported Date",
-      order.delivery_date
-        ? new Date(order.delivery_date).toLocaleDateString("en-GB")
-        : new Date(order.delivery_date || Date.now()).toLocaleDateString("en-GB"),
+      order.reported_date
+        ? new Date(order.reported_date).toLocaleDateString("en-GB")
+        : new Date(order.entry_date || Date.now()).toLocaleDateString("en-GB"),
       "document",
     ],
   ];
 
   let rowY = contentTop;
-  const rowGap = 12.4;
+  const rowGap = 8.4;
   const labelX = cardX + 20;
   const valueX = cardX + 58;
 
@@ -306,7 +301,7 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
     drawFieldIcon(doc, icon, cardX + 11, rowY - 2, 7, TEAL);
 
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(15.5);
+    doc.setFontSize(10.5);
     setText(doc, DARK_TEXT);
     doc.text(label, labelX, rowY);
 
@@ -325,12 +320,11 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
     if (idx < fields.length - 1) {
       setDraw(doc, [225, 227, 230]);
       doc.setLineWidth(0.15);
-      doc.line(labelX - 8, rowY + 3.6, splitX - 6, rowY + 2.6);
+      doc.line(labelX - 8, rowY + 2.6, splitX - 6, rowY + 2.6);
     }
     rowY += rowGap;
   });
 
-  // ---------- Right column: RESULT ----------
   const rightCenterX = splitX + (cardX + cardW - splitX) / 2;
   const isFemale = /female/i.test(order.sex || "");
   const resultColor = isFemale ? PINK : TEAL;
@@ -350,18 +344,18 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   doc.setLineWidth(0.5);
   doc.roundedRect(boxX, boxY, boxW, boxH, 3, 3, "S");
 
-  // setFill(doc, resultColor);
-  // doc.circle(boxX + 16, boxY + boxH / 2, 10, "F");
-  // setText(doc, [255, 255, 255]);
+  setFill(doc, resultColor);
+  doc.circle(boxX + 16, boxY + boxH / 2, 10, "F");
+  setText(doc, [255, 255, 255]);
   doc.setFontSize(14);
-  // doc.text(isFemale ? "\u2640" : "\u2642", boxX + 16, boxY + boxH / 2 + 4, {
-  //   align: "center",
-  // });
+  doc.text(isFemale ? "\u2640" : "\u2642", boxX + 16, boxY + boxH / 2 + 4, {
+    align: "center",
+  });
 
   setText(doc, resultColor);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(24);
-  doc.text((order.sex || "N/A").toUpperCase(), boxX + 40, boxY + boxH / 2 + 5, { align: "center" });
+  doc.text((order.sex || "N/A").toUpperCase(), boxX + 32, boxY + boxH / 2 + 5);
 
   const divY = boxY + boxH + 10;
   setDraw(doc, [210, 213, 218]);
@@ -370,24 +364,23 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   setFill(doc, TEAL);
   doc.circle(rightCenterX, divY, 1, "F");
 
-  // QR code
-  const verifyBaseUrl = settings?.verify_base_url || "https://vetgenelab.example.com/verify";
-  const qrText = `${verifyBaseUrl}/${order.dna_id || order._id}`;
+  // ---- QR: points to the PUBLIC download route, no login needed ----
+  const baseUrl = resolveBaseUrl(settings);
+  const qrText = `${baseUrl}/api/verify/${order.dna_id || order._id}`;
   try {
     const qrDataUrl = await getQrDataUrl(qrText);
-    const qrSize = 50;
+    const qrSize = 26;
     doc.addImage(qrDataUrl, "PNG", splitX + 8, divY + 4, qrSize, qrSize);
 
     setText(doc, DARK_TEXT);
     doc.setFont("helvetica", "bold");
-    doc.setFontSize(15.5);
+    doc.setFontSize(8.5);
     doc.text("Scan to", splitX + 8 + qrSize + 10, divY + 14);
-    doc.text("Verify", splitX + 8 + qrSize + 10, divY + 19);
+    doc.text("Download", splitX + 8 + qrSize + 10, divY + 19);
   } catch (qrErr) {
     console.error("QR generation failed:", qrErr);
   }
 
-  // ---------- Footer bar ----------
   const footerH = 16;
   const footerY = cardY + cardH - footerH;
   setFill(doc, NAVY);
@@ -421,7 +414,6 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
     doc.text(String(col.value), cx + 8, footerY + 11.5);
   });
 
-  // Bottom confidentiality strip
   setText(doc, GRAY_TEXT);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7.5);
@@ -433,58 +425,21 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
   );
 }
 
-export async function POST(req: NextRequest) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+/**
+ * Generates a certificate PDF for one or more orders and returns it as a Buffer.
+ * Used by both the protected admin export route and the public verify/download route.
+ */
+export async function generateCertificatePdf(orders: any[], settings: any): Promise<Buffer> {
+  const doc = new jsPDF({
+    orientation: "landscape",
+    unit: "mm",
+    format: [PAGE_W, PAGE_H],
+  });
 
-    const body = await req.json();
-    const { orderIds } = body;
-    
-    if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
-      return NextResponse.json(
-        { error: "No orders selected" },
-        { status: 400 }
-      );
-    }
-
-    await connectDB();
-
-    const orders = await Order.find({
-      _id: { $in: orderIds.map((id) => new mongoose.Types.ObjectId(id)) },
-    })
-      .populate("species_id", "name")
-      .populate("customer_id", "name phone farm_name address");
-
-    const settings = await Settings.findById("default");
-
-    const doc = new jsPDF({
-      orientation: "landscape",
-      unit: "mm",
-      format: [PAGE_W, PAGE_H],
-    });
-
-    for (let i = 0; i < orders.length; i++) {
-      if (i > 0) doc.addPage([PAGE_W, PAGE_H], "landscape");
-      await drawCertificate(doc, orders[i], settings);
-    }
-
-    const pdfBuffer = doc.output("arraybuffer");
-
-    return new NextResponse(Buffer.from(pdfBuffer), {
-      headers: {
-        "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="dna-sexing-report-${Date.now()}.pdf"`,
-      },
-    });
-  } catch (error) {
-    console.error("PDF export error:", error);
-    return NextResponse.json(
-      { error: "Failed to generate PDF" },
-      { status: 500 }
-    );
+  for (let i = 0; i < orders.length; i++) {
+    if (i > 0) doc.addPage([PAGE_W, PAGE_H], "landscape");
+    await drawCertificate(doc, orders[i], settings);
   }
-}
 
+  return Buffer.from(doc.output("arraybuffer"));
+}

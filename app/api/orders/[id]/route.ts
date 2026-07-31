@@ -64,17 +64,16 @@ export async function PUT(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-
-
-    const order = await Order.findOneAndReplace(
+    const order = await Order.findByIdAndUpdate(
       id,
       {
         ...validated,
         entry_date: new Date(validated.entry_date),
-        delivery_date: new Date(validated.delivery_date),
+        delivery_date: validated.delivery_date
+          ? new Date(validated.delivery_date)
+          : null,
       },
       {
-        returnDocument: "after",
         new: true,
         runValidators: true,
       }

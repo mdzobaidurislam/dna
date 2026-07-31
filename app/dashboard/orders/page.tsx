@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Plus, Edit2, Trash2, FileText, Download } from "lucide-react";
+import { Plus, Edit2, Trash2, FileText, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OrderForm } from "@/components/forms/OrderForm";
 
@@ -394,7 +394,7 @@ export default function OrdersPage() {
                   DNA ID
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
-                  Name
+                  Birth ID
                 </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-900 dark:text-white">
                   Species
@@ -448,7 +448,7 @@ export default function OrdersPage() {
                     {new Date(order.entry_date).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-3 text-gray-600 dark:text-gray-400">
-                    {new Date(order.delivery_date).toLocaleTimeString()}
+                    {new Date(order.delivery_date).toLocaleDateString()}
                   </td>
                   <td className="px-6 py-3">
                     <span
@@ -470,6 +470,12 @@ export default function OrdersPage() {
                   </td>
                   <td className="px-6 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      <a
+                        href={`/api/orders/generate-invoice/${order._id}`}
+                        className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-slate-600 rounded"
+                      >
+                        <Eye size={18} />
+                      </a>
                       <button
                         onClick={() => generateInvoice(order._id)}
                         className="p-2 text-green-600 hover:bg-green-50 dark:hover:bg-slate-600 rounded"
