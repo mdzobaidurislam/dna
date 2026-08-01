@@ -42,7 +42,6 @@ export async function PUT(req: NextRequest) {
 
     const body = await req.json();
     const validated = settingsSchema.parse(body);
-
     await connectDB();
 
     let settings = await Settings.findByIdAndUpdate("default", validated, {

@@ -35,7 +35,11 @@ export const settingsSchema = z.object({
   office_address: z.string().optional(),
   office_phone: z.string().optional(),
   office_email: z.string().email("Invalid email").optional().or(z.literal("")),
+  whatsapp_number: z.string().optional(),
   logo_url: z.string().optional(),
+  signature_url: z.string().optional(),
+  doctor_name: z.string().optional(),
+  doctor_designation: z.string().optional(),
 });
 
 export type SpeciesInput = z.infer<typeof speciesSchema>;

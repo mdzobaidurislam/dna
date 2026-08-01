@@ -24,6 +24,8 @@ const CustomerSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
+if (process.env.NODE_ENV !== "production" && mongoose.models.Customer) {
+  delete mongoose.models.Customer;
+}
 export default mongoose.models.Customer ||
   mongoose.model("Customer", CustomerSchema);

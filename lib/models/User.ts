@@ -38,4 +38,8 @@ UserSchema.pre("save", async function (next: any) {
   next();
 });
 
+if (process.env.NODE_ENV !== "production" && mongoose.models.User) {
+  delete mongoose.models.User;
+}
+
 export default mongoose.models.User || mongoose.model("User", UserSchema);

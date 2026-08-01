@@ -53,4 +53,8 @@ const OrderSchema = new mongoose.Schema(
   }
 );
 
+if (process.env.NODE_ENV !== "production" && mongoose.models.Order) {
+  delete mongoose.models.Order;
+}
 export default mongoose.models.Order || mongoose.model("Order", OrderSchema);
+

@@ -18,6 +18,8 @@ const SpeciesSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
-
+if (process.env.NODE_ENV !== "production" && mongoose.models.Species) {
+  delete mongoose.models.Species;
+}
 export default mongoose.models.Species ||
   mongoose.model("Species", SpeciesSchema);
