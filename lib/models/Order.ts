@@ -36,7 +36,7 @@ const OrderSchema = new mongoose.Schema(
     },
     sample_type: {
       type: String,
-      default: 'Feather',
+      default: "Feather",
     },
     sex: {
       type: String,
@@ -47,14 +47,31 @@ const OrderSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    isDeleted: {
+      type: Boolean,
+      default: false,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
   }
 );
 
+function excludeDeleted(this: any) {
+  if (this.getFilter().isDeleted === undefined) {
+    this.where({ isDeleted: { $ne: true } });
+  }
+}
+
+OrderSchema.pre("find", excludeDeleted);
+OrderSchema.pre("findOne", excludeDeleted);
+OrderSchema.pre("countDocuments", excludeDeleted);
+
 if (process.env.NODE_ENV !== "production" && mongoose.models.Order) {
   delete mongoose.models.Order;
 }
 export default mongoose.models.Order || mongoose.model("Order", OrderSchema);
-

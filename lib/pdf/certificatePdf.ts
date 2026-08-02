@@ -375,7 +375,7 @@ async function drawCertificate(
     ["Ring ID", order.name ? String(order.name) : "-", "bird"],
     ["Species", order.species_id?.name || "N/A", "leaf"],
     ["Owner Name", order.customer_id?.name || "N/A", "person"],
-    ["Firm Name", order.customer_id?.farm_name || "N/A", "house"],
+    ["Farm Name", order.customer_id?.farm_name || "N/A", "house"],
     ["Sample Type", order.sample_type || "Feather", "leaf"],
     ["DNA Result", order.sex || "N/A", "clipboard"],
     [
@@ -417,7 +417,9 @@ async function drawCertificate(
     } else {
       setText(doc, [40, 45, 55]);
     }
-    doc.text(value, valueX, rowY);
+    // doc.text(value, valueX, rowY);
+    const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+    doc.text(capitalizedValue, valueX, rowY);
 
     if (idx < fields.length - 1) {
       setDraw(doc, [225, 227, 230]);

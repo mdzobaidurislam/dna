@@ -315,7 +315,9 @@ async function drawCertificate(doc: jsPDF, order: any, settings: any) {
     } else {
       setText(doc, [40, 45, 55]);
     }
-    doc.text(value, valueX, rowY);
+    // doc.text(value, valueX, rowY);
+    const capitalizedValue = value.charAt(0).toUpperCase() + value.slice(1);
+    doc.text(capitalizedValue, valueX, rowY);
 
     if (idx < fields.length - 1) {
       setDraw(doc, [225, 227, 230]);

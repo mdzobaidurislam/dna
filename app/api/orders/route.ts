@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
     }
 
     await connectDB();
-
+  
     const { searchParams } = new URL(req.url);
     const status = searchParams.get("status");
     const customer_id = searchParams.get("customer_id");
@@ -25,12 +25,23 @@ export async function GET(req: NextRequest) {
     const startDate = searchParams.get("startDate");
     const endDate = searchParams.get("endDate");
     const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
+    const limit = parseInt(searchParams.get("limit") || "20");
 
     let query: any = {};
 
+    query.isDeleted = { $ne: true };
     if (status && status !== "all") {
       query.status = status;
+    }
+    // ringId 
+    if (searchParams.get("ringId")) {
+      const ringId = searchParams.get("ringId");
+      query.name = { $regex: ringId, $options: "i" };
+    }
+    // dna_id 
+    if (searchParams.get("dna_id")) {
+      const dna_id = searchParams.get("dna_id");
+      query.dna_id = dna_id;
     }
 
     if (customer_id && mongoose.Types.ObjectId.isValid(customer_id)) {

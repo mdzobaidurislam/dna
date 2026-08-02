@@ -121,7 +121,12 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid ID" }, { status: 400 });
     }
 
-    const order = await Order.findByIdAndDelete(id);
+    // const order = await Order.findByIdAndDelete(id);
+    const order = await Order.findByIdAndUpdate(
+      id,
+      { isDeleted: true, deletedAt: new Date() },
+      { new: true }
+    );
 
     if (!order) {
       return NextResponse.json({ error: "Order not found" }, { status: 404 });

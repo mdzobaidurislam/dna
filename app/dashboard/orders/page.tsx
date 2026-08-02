@@ -4,7 +4,10 @@ import { useState, useEffect } from "react";
 import { Plus, Edit2, Trash2, FileText, Download, Eye } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { OrderForm } from "@/components/forms/OrderForm";
-
+import { AnimatePresence, motion } from "framer-motion";
+import { toast } from "sonner";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 interface Order {
   _id: string;
   dna_id: number;
@@ -22,10 +25,13 @@ interface Order {
 export default function OrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<any>(null);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
+  const [page, setPage] = useState(1);
+  const [limit] = useState(25);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalOrders, setTotalOrders] = useState(0);
 
   // Filters
   const [filterStatus, setFilterStatus] = useState("all");
@@ -33,29 +39,66 @@ export default function OrdersPage() {
   const [filterSpecies, setFilterSpecies] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [ringId, setRingId] = useState("");
+  const [dna_id, setDnaId] = useState("");
 
   const [customers, setCustomers] = useState<any[]>([]);
   const [species, setSpecies] = useState<any[]>([]);
   const [exporting, setExporting] = useState(false);
 
+  const [showForm, setShowForm] = useState(false);
+  const [formVisible, setFormVisible] = useState(false); // controls animation state
+
+  function openForm() {
+    setShowForm(true);
+    // next tick, trigger the enter transition
+    requestAnimationFrame(() => setFormVisible(true));
+  }
+
+  function closeForm() {
+    setFormVisible(false);
+    setTimeout(() => {
+      setShowForm(false);
+      setEditingId(null);
+      setEditingData(null);
+    }, 200); // match transition duration
+  }
+
+
+  useEffect(() => {
+    fetchDropdownData();
+  }, [filterStatus, filterCustomer, filterSpecies, startDate, endDate, ringId, dna_id]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterStatus, filterCustomer, filterSpecies, startDate, endDate, ringId, dna_id]);
+
   useEffect(() => {
     fetchOrders();
-    fetchDropdownData();
-  }, [filterStatus, filterCustomer, filterSpecies, startDate, endDate]);
+  }, [filterStatus, filterCustomer, filterSpecies, startDate, endDate, ringId, dna_id, page]);
+
 
   async function fetchOrders() {
     try {
+      setLoading(true);
       const params = new URLSearchParams();
       if (filterStatus !== "all") params.append("status", filterStatus);
       if (filterCustomer) params.append("customer_id", filterCustomer);
       if (filterSpecies) params.append("species_id", filterSpecies);
       if (startDate) params.append("startDate", startDate);
       if (endDate) params.append("endDate", endDate);
+      if (ringId) params.append("ringId", ringId);
+      if (dna_id) params.append("dna_id", dna_id);
+      params.append("page", String(page));
+      params.append("limit", String(limit));
 
       const res = await fetch(`/api/orders?${params}`);
       const data = await res.json();
       if (data.success) {
         setOrders(data.data);
+        setTotalPages(data.pagination?.totalPages || 1);
+        setTotalOrders(data.pagination?.total || 0);
+        setSelectedOrders([]); // clear stale selections across pages
       }
     } catch (error) {
       console.error("Error fetching orders:", error);
@@ -96,11 +139,12 @@ export default function OrdersPage() {
         setShowForm(false);
         setEditingId(null);
         setEditingData(null);
+        toast.success(editingId ? "Order updated successfully" : "Order created successfully")
       } else {
         throw new Error(data.error || "Failed to save order");
       }
     } catch (error: any) {
-      throw new Error(error.message);
+      toast.error(error.message);
     }
   }
 
@@ -112,8 +156,10 @@ export default function OrdersPage() {
       const data = await res.json();
       if (data.success) {
         await fetchOrders();
+        toast.success("Order deleted successfully");
       }
     } catch (error) {
+      toast.error("Error deleting order");
       console.error("Error deleting order:", error);
     }
   }
@@ -230,7 +276,7 @@ export default function OrdersPage() {
         </div>
         <Button
           onClick={() => {
-            setShowForm(!showForm);
+            openForm();
             setEditingId(null);
             setEditingData(null);
           }}
@@ -241,22 +287,49 @@ export default function OrdersPage() {
         </Button>
       </div>
 
-      {showForm && (
-        <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 mb-8">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
-            {editingId ? "Edit Order" : "New Order"}
-          </h2>
-          <OrderForm
-            initialData={editingData}
-            onSubmit={handleSubmit}
-            onCancel={() => {
-              setShowForm(false);
-              setEditingId(null);
-              setEditingData(null);
-            }}
-          />
-        </div>
-      )}
+{/* modals and forms */}
+<AnimatePresence>
+  {showForm && (
+    <>
+      {/* backdrop overlay */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        onClick={() => {
+          setShowForm(false);
+          setEditingId(null);
+          setEditingData(null);
+        }}
+        className="fixed inset-0 bg-black/50 z-40"
+      />
+
+      {/* centered panel */}
+      <motion.div
+        initial={{ opacity: 0, scale: 0.96 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.96 }}
+        transition={{ duration: 0.2, ease: "easeOut" }}
+        className="bg-white dark:bg-slate-800 rounded-lg shadow-xl p-6 fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-50 overflow-auto w-4/5 md:w-1/2 lg:w-1/3 xl:w-1/4 max-h-[90vh]"
+      >
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">
+          {editingId ? "Edit Order" : "New Order"}
+        </h2>
+        <OrderForm
+          initialData={editingData}
+          onSubmit={handleSubmit}
+          onCancel={() => {
+            setShowForm(false);
+            setEditingId(null);
+            setEditingData(null);
+          }}
+        />
+      </motion.div>
+    </>
+  )}
+</AnimatePresence>
+ 
 
       {/* Filters */}
       <div className="bg-white dark:bg-slate-800 rounded-lg shadow p-6 mb-6">
@@ -315,6 +388,28 @@ export default function OrdersPage() {
                 </option>
               ))}
             </select>
+          </div>
+          <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Ring ID
+              </label>
+              <input
+                type="text"
+                value={ringId}
+                onChange={(e) => setRingId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              />
+          </div>
+          <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                DNA ID
+              </label>
+              <input
+                type="text"
+                value={dna_id}
+                onChange={(e) => setDnaId(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-700 text-gray-900 dark:text-white"
+              />
           </div>
 
           <div>
@@ -507,6 +602,32 @@ export default function OrdersPage() {
           </table>
         )}
       </div>
+      {!loading && orders.length > 0 && (
+        <div className="flex items-center justify-between px-6 py-4 bg-white dark:bg-slate-800 rounded-lg shadow mt-4">
+          <div className="text-sm text-gray-600 dark:text-gray-400">
+            Showing page {page} of {totalPages} ({totalOrders} total orders)
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              disabled={page === 1}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-800 disabled:opacity-50 dark:bg-slate-700 dark:text-white cursor-pointer"
+            >
+              Previous
+            </Button>
+            <span className="text-sm text-gray-700 dark:text-gray-300 px-2">
+              {page} / {totalPages}
+            </span>
+            <Button
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+              className="bg-gray-200 hover:bg-gray-300 text-gray-800 disabled:opacity-50 dark:bg-slate-700 dark:text-white cursor-pointer"
+            >
+              Next
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
